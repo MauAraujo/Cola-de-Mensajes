@@ -6,8 +6,12 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <wait.h>
 
-int colaClientesid, pid, i, status;
+int colaClientesid, pid, i, status, len, salir;
+double promedio, promedio_total;
+
+struct msqid_ds qStatus;
 
 struct msgbuf {
 	long msg_type;
@@ -35,12 +39,21 @@ void asignarTiempos() {
 	int time;
 	for(i = 0; i < 20; i++) {
 		time = rand()%(10-1 + 1) + 1;
-		printf("Time = %d\n", time);
 		colaClientes.msg_type = i+1;
 		colaClientes.tiempo = time;
 		msgsnd(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0);
 	}
+}
 
+void transaccion(int pid) {
+  len = msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0, 0);
+  printf("Tiempo de cliente en caja %d: %d\n", pid, colaClientes.tiempo);
+  cajero.tiempo = colaClientes.tiempo;
+  cajero.num_clientes++;
+  cajero.tiempo_total += cajero.tiempo;
+  sleep(cajero.tiempo);
+  cajero.tiempo = 0;
+  salir++;
 }
 
 int eliminarCola() {
@@ -53,7 +66,7 @@ int eliminarCola() {
 }
 
 int main() {
-	int salir = 0, len;
+  int estado;
 	key_t key;
 	key=1909;
 
@@ -70,55 +83,45 @@ int main() {
 
 	switch(pid) {
 		case 0:
-			printf("Proceso %d\n", pid);
 			for(i=1;i<5;i++) wait(&status);
+
 			eliminarCola();
 			exit(1);
 
 		case 1:
-			printf("Proceso %d\n", pid);
-				len = msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0, 0);
-					printf("Tiempo de cliente 1: %d\n", colaClientes.tiempo);
-					cajero.tiempo = colaClientes.tiempo;
-					cajero.num_clientes++;
-					cajero.tiempo_total += cajero.tiempo;
-					sleep(cajero.tiempo);
-					cajero.tiempo = 0;
-					salir++;
-	
-			exit(0);
+      do {
+        transaccion(pid);
+        estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+      } while(qStatus.msg_qnum != 0);
+      promedio = cajero.tiempo_total/cajero.num_clientes;
+      printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+      exit(0);
 
 		case 2:
-			printf("Proceso %d\n", pid);
-			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
-			printf("Tiempo de cliente 2: %d\n", colaClientes.tiempo);
-			cajero.tiempo = colaClientes.tiempo;
-			cajero.num_clientes++;
-			cajero.tiempo_total += cajero.tiempo;
-			sleep(cajero.tiempo);
-			cajero.tiempo = 0;
+      do {
+        transaccion(pid);
+        estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+      } while(qStatus.msg_qnum != 0);
+      promedio = cajero.tiempo_total/cajero.num_clientes;
+      printf("Tiempo promedio caja %d: %f\n", pid, promedio);
 			exit(0);
 
 		case 3:
-			printf("Proceso %d\n", pid);
-			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
-			printf("Tiempo de cliente 3: %d\n", colaClientes.tiempo);
-			cajero.tiempo = colaClientes.tiempo;
-			cajero.num_clientes++;
-			cajero.tiempo_total += cajero.tiempo;
-			sleep(cajero.tiempo);
-			cajero.tiempo = 0;
+      do {
+        transaccion(pid);
+        estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+      } while(qStatus.msg_qnum != 0);
+      promedio = cajero.tiempo_total/cajero.num_clientes;
+      printf("Tiempo promedio caja %d: %f\n", pid, promedio);
 			exit(0);
 
-		case 4:
-			printf("Proceso %d\n", pid);
-			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
-			printf("Tiempo de cliente 4: %d\n", colaClientes.tiempo);
-			cajero.tiempo = colaClientes.tiempo;
-			cajero.num_clientes++;
-			cajero.tiempo_total += cajero.tiempo;
-			sleep(cajero.tiempo);
-			cajero.tiempo = 0;
-			exit(0);
+  case 4:
+    do {
+      transaccion(pid);
+      estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+    } while(qStatus.msg_qnum != 0);
+    promedio = cajero.tiempo_total/cajero.num_clientes;
+    printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+    exit(0);
 	}
 }
