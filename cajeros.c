@@ -14,7 +14,7 @@ struct msgbuf {
 	int tiempo;
 }colaClientes;
 
-typedef struct{
+struct cajeros{
 	int tiempo; //El tiempo que tarda con cada cliente
 	int num_clientes; //Numero de clientes atendidos
 	int tiempo_total;  //Toatl de tiempo invertido
@@ -35,7 +35,7 @@ void asignarTiempos() {
 	int time;
 	for(i = 0; i < 20; i++) {
 		time = rand()%(10-1 + 1) + 1;
-		// printf("Time = %d\n", time);
+		printf("Time = %d\n", time);
 		colaClientes.msg_type = i+1;
 		colaClientes.tiempo = time;
 		msgsnd(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0);
@@ -53,7 +53,7 @@ int eliminarCola() {
 }
 
 int main() {
-
+	int salir = 0, len;
 	key_t key;
 	key=1909;
 
@@ -61,6 +61,10 @@ int main() {
 	colaClientesid = msgget(key, IPC_CREAT | 0666);
 	printf("Cola de mensajes creada con id: %d\n", colaClientesid);
 	asignarTiempos();
+
+	//Inicializa cajero
+	cajero.num_clientes = 0;
+	cajero.tiempo_total = 0;
 
 	pid = nfork(6);
 
@@ -73,28 +77,48 @@ int main() {
 
 		case 1:
 			printf("Proceso %d\n", pid);
-			// for(i = 0; i < 50; i++) {
-				msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0, 0);
-				printf("Tiempo de cliente 1: %d\n", colaClientes.tiempo);
-			// }
+				len = msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0, 0);
+					printf("Tiempo de cliente 1: %d\n", colaClientes.tiempo);
+					cajero.tiempo = colaClientes.tiempo;
+					cajero.num_clientes++;
+					cajero.tiempo_total += cajero.tiempo;
+					sleep(cajero.tiempo);
+					cajero.tiempo = 0;
+					salir++;
+	
 			exit(0);
 
 		case 2:
 			printf("Proceso %d\n", pid);
 			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
 			printf("Tiempo de cliente 2: %d\n", colaClientes.tiempo);
+			cajero.tiempo = colaClientes.tiempo;
+			cajero.num_clientes++;
+			cajero.tiempo_total += cajero.tiempo;
+			sleep(cajero.tiempo);
+			cajero.tiempo = 0;
 			exit(0);
 
 		case 3:
 			printf("Proceso %d\n", pid);
 			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
 			printf("Tiempo de cliente 3: %d\n", colaClientes.tiempo);
+			cajero.tiempo = colaClientes.tiempo;
+			cajero.num_clientes++;
+			cajero.tiempo_total += cajero.tiempo;
+			sleep(cajero.tiempo);
+			cajero.tiempo = 0;
 			exit(0);
 
 		case 4:
 			printf("Proceso %d\n", pid);
 			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
 			printf("Tiempo de cliente 4: %d\n", colaClientes.tiempo);
+			cajero.tiempo = colaClientes.tiempo;
+			cajero.num_clientes++;
+			cajero.tiempo_total += cajero.tiempo;
+			sleep(cajero.tiempo);
+			cajero.tiempo = 0;
 			exit(0);
 	}
 }
