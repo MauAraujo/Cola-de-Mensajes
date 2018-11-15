@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
-#include <wait.h>
+#include <sys/wait.h>
 
 int colaClientesid, pid, i, status, len, salir;
 double promedio, promedio_total;
@@ -52,6 +52,7 @@ void transaccion(int pid) {
   cajero.num_clientes++;
   cajero.tiempo_total += cajero.tiempo;
   sleep(cajero.tiempo);
+	// sleep(1);
   cajero.tiempo = 0;
   salir++;
 }
@@ -65,7 +66,13 @@ int eliminarCola() {
 	exit(EXIT_SUCCESS);
 }
 
+void prom(){
+	promedio = (double)cajero.tiempo_total/(double)cajero.num_clientes;
+	printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+}
+
 int main() {
+	system("clear");
   int estado;
 	key_t key;
 	key=1909;
@@ -92,36 +99,50 @@ int main() {
       do {
         transaccion(pid);
         estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
-      } while(qStatus.msg_qnum != 0);
-      promedio = cajero.tiempo_total/cajero.num_clientes;
-      printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+				printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+				if(estado != 0) {
+					printf("%d\n", estado);
+					break;
+				}
+      } while(qStatus.msg_qnum > 0);
+      prom();
       exit(0);
 
 		case 2:
       do {
         transaccion(pid);
         estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
-      } while(qStatus.msg_qnum != 0);
-      promedio = cajero.tiempo_total/cajero.num_clientes;
-      printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+				printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+				if(estado != 0) {
+					break;
+				}
+      } while(qStatus.msg_qnum > 0);
+      prom();
 			exit(0);
 
 		case 3:
       do {
         transaccion(pid);
         estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
-      } while(qStatus.msg_qnum != 0);
-      promedio = cajero.tiempo_total/cajero.num_clientes;
-      printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+				printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+				if(estado != 0) {
+					break;
+				}
+      } while(qStatus.msg_qnum > 0);
+      prom();
 			exit(0);
 
   case 4:
     do {
       transaccion(pid);
       estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
-    } while(qStatus.msg_qnum != 0);
-    promedio = cajero.tiempo_total/cajero.num_clientes;
-    printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+			printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+			if(estado != 0) {
+				printf("Error actualizando en proceso %d con estado %d\n", pid, estado);
+				break;
+			}
+    } while(qStatus.msg_qnum > 0);
+		prom();
     exit(0);
 	}
 }
