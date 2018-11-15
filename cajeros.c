@@ -7,12 +7,18 @@
 #include <unistd.h>
 #include <time.h>
 
-int colaClientesid, pid, i;
+int colaClientesid, pid, i, status;
 
 struct clientes {
 	long msg_type;
-	int tiempo;
+	int tiempo[20];
 }colaClientes;
+
+typedef struct{
+	int tiempo; //El tiempo que tarda con cada cliente
+	int num_clientes; //Numero de clientes atendidos
+	int tiempo_total;  //Toatl de tiempo invertido
+}CAJERO;
 
 int nfork(int np) {
 	int i;
@@ -27,13 +33,14 @@ int nfork(int np) {
 
 void asignarTiempos() {
 	int time;
-	for(i = 0; i < 50; i++) {
+	for(i = 0; i < 20; i++) {
 		time = rand()%(10-1 + 1) + 1;
 		printf("Time = %d\n", time);
 		colaClientes.msg_type = time;
-		colaClientes.tiempo = time;
+		colaClientes.tiempo[i] = time;
 		msgsnd(colaClientesid, &colaClientes, sizeof(colaClientes), 0);
 	}
+
 }
 
 int eliminarCola() {
@@ -46,6 +53,7 @@ int eliminarCola() {
 }
 
 int main() {
+
 	key_t key;
 	key=1909;
 
@@ -57,28 +65,35 @@ int main() {
 	pid = nfork(6);
 
 	switch(pid) {
-		case 0: 
+		case 0:
 			printf("Proceso %d\n", pid);
+			for(i=1;i<5;i++) wait(&status);
 			exit(1);
 
 		case 1:
 			printf("Proceso %d\n", pid);
-			for(i = 0; i < 50; i++) {
+			// for(i = 0; i < 50; i++) {
 				msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
-				printf("Tiempo de cliente 1: %d\n", (&colaClientes)->tiempo);
-			}
+				printf("Tiempo de cliente 1: %d\n", *colaClientes.tiempo);
+			// }
 			exit(0);
 
 		case 2:
 			printf("Proceso %d\n", pid);
+			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
+			printf("Tiempo de cliente 2: %d\n", *colaClientes.tiempo);
 			exit(0);
 
 		case 3:
 			printf("Proceso %d\n", pid);
+			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
+			printf("Tiempo de cliente 3: %d\n", *colaClientes.tiempo);
 			exit(0);
 
 		case 4:
 			printf("Proceso %d\n", pid);
+			msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
+			printf("Tiempo de cliente 4: %d\n", *colaClientes.tiempo);
 			exit(0);
 	}
 }
