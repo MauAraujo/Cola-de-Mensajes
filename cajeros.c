@@ -6,13 +6,23 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/wait.h>
 
-int colaClientesid, pid, i;
+int colaClientesid, pid, i, status, len, salir;
+double promedio, promedio_total;
 
-struct clientes {
+struct msqid_ds qStatus;
+
+struct msgbuf {
 	long msg_type;
 	int tiempo;
 }colaClientes;
+
+struct cajeros{
+	int tiempo; //El tiempo que tarda con cada cliente
+	int num_clientes; //Numero de clientes atendidos
+	int tiempo_total;  //Toatl de tiempo invertido
+}cajero;
 
 int nfork(int np) {
 	int i;
@@ -27,13 +37,24 @@ int nfork(int np) {
 
 void asignarTiempos() {
 	int time;
-	for(i = 0; i < 50; i++) {
+	for(i = 0; i < 20; i++) {
 		time = rand()%(10-1 + 1) + 1;
-		printf("Time = %d\n", time);
-		colaClientes.msg_type = time;
+		colaClientes.msg_type = i+1;
 		colaClientes.tiempo = time;
-		msgsnd(colaClientesid, &colaClientes, sizeof(colaClientes), 0);
+		msgsnd(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0);
 	}
+}
+
+void transaccion(int pid) {
+  len = msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes.tiempo), 0, 0);
+  printf("Tiempo de cliente en caja %d: %d\n", pid, colaClientes.tiempo);
+  cajero.tiempo = colaClientes.tiempo;
+  cajero.num_clientes++;
+  cajero.tiempo_total += cajero.tiempo;
+  sleep(cajero.tiempo);
+	// sleep(1);
+  cajero.tiempo = 0;
+  salir++;
 }
 
 int eliminarCola() {
@@ -45,7 +66,14 @@ int eliminarCola() {
 	exit(EXIT_SUCCESS);
 }
 
+void prom(){
+	promedio = (double)cajero.tiempo_total/(double)cajero.num_clientes;
+	printf("Tiempo promedio caja %d: %f\n", pid, promedio);
+}
+
 int main() {
+	system("clear");
+  int estado;
 	key_t key;
 	key=1909;
 
@@ -54,31 +82,67 @@ int main() {
 	printf("Cola de mensajes creada con id: %d\n", colaClientesid);
 	asignarTiempos();
 
+	//Inicializa cajero
+	cajero.num_clientes = 0;
+	cajero.tiempo_total = 0;
+
 	pid = nfork(6);
 
 	switch(pid) {
-		case 0: 
-			printf("Proceso %d\n", pid);
+		case 0:
+			for(i=1;i<5;i++) wait(&status);
+
+			eliminarCola();
 			exit(1);
 
 		case 1:
-			printf("Proceso %d\n", pid);
-			for(i = 0; i < 50; i++) {
-				msgrcv(colaClientesid, &colaClientes, sizeof(colaClientes), 0, 0);
-				printf("Tiempo de cliente 1: %d\n", (&colaClientes)->tiempo);
-			}
-			exit(0);
+      do {
+        transaccion(pid);
+        estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+				printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+				if(estado != 0) {
+					printf("%d\n", estado);
+					break;
+				}
+      } while(qStatus.msg_qnum > 0);
+      prom();
+      exit(0);
 
 		case 2:
-			printf("Proceso %d\n", pid);
+      do {
+        transaccion(pid);
+        estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+				printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+				if(estado != 0) {
+					break;
+				}
+      } while(qStatus.msg_qnum > 0);
+      prom();
 			exit(0);
 
 		case 3:
-			printf("Proceso %d\n", pid);
+      do {
+        transaccion(pid);
+        estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+				printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+				if(estado != 0) {
+					break;
+				}
+      } while(qStatus.msg_qnum > 0);
+      prom();
 			exit(0);
 
-		case 4:
-			printf("Proceso %d\n", pid);
-			exit(0);
+  case 4:
+    do {
+      transaccion(pid);
+      estado = msgctl(colaClientesid, IPC_STAT, &qStatus);
+			printf("Mensajes restantes: %d\n", qStatus.msg_qnum);
+			if(estado != 0) {
+				printf("Error actualizando en proceso %d con estado %d\n", pid, estado);
+				break;
+			}
+    } while(qStatus.msg_qnum > 0);
+		prom();
+    exit(0);
 	}
 }
